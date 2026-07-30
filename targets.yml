@@ -15,9 +15,10 @@ ignore:
   # example.com: [TXT]
 
 targets:
-  - domain: example.com
-
-  - domain: iana.org
+  - domain: devopsenabler.com
+  - domain: aiopsenabler.com
+  - domain: cyntra360hub.com 
+  - domain: aiopscommunity.com
     record_types: [A, NS]
 
   # - domain: your-domain.com
