@@ -1,0 +1,24 @@
+# dns-drift targets
+#
+# Add the domains you care about. Anything that changes between runs is
+# reported as drift against the committed baseline in snapshots/.
+
+record_types: [A, AAAA, MX, NS, TXT]   # default for every target
+timeout: 5.0
+nameservers:
+  - 1.1.1.1
+  - 8.8.8.8
+
+# Per-domain record types that should never be reported (noisy rotators,
+# verification tokens you change often, etc.)
+ignore:
+  # example.com: [TXT]
+
+targets:
+  - domain: example.com
+
+  - domain: iana.org
+    record_types: [A, NS]
+
+  # - domain: your-domain.com
+  #   record_types: [A, AAAA, MX, NS, TXT, CAA]

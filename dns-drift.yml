@@ -1,0 +1,88 @@
+name: dns-drift
+
+on:
+  schedule:
+    # every 6 hours, off the hour to avoid the top-of-hour Actions stampede
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "Accept current DNS state as the new baseline"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - "targets.yml"
+      - "agent.py"
+      - ".github/workflows/dns-drift.yml"
+
+permissions:
+  contents: write   # commit refreshed baseline snapshots
+  id-token: write   # keyless (OIDC) reporting to a monitoring platform
+
+concurrency:
+  group: dns-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run dns-drift
+        id: run
+        run: |
+          python agent.py \
+            --config targets.yml \
+            --snapshots snapshots \
+            --out result.json \
+            ${{ inputs.update_baseline && '--update-baseline' || '' }}
+
+      - name: Commit updated baselines
+        if: always()
+        run: |
+          if [[ -z "$(git status --porcelain snapshots)" ]]; then
+            echo "no baseline changes"
+            exit 0
+          fi
+          git config user.name "dns-drift[bot]"
+          git config user.email "dns-drift@users.noreply.github.com"
+          git add snapshots
+          git commit -m "chore: refresh DNS baselines [skip ci]"
+          git push
+
+      # ------------------------------------------------------------------ #
+      # Reporting
+      #
+      # Replace this step with the snippet the monitoring platform's connect
+      # wizard generates for you (e.g. aiopsenabler.com issues an exact
+      # workflow block + the secret names to add). result.json already carries
+      # the outcome, summary, metrics and findings in a portable shape.
+      # ------------------------------------------------------------------ #
+      - name: Report run
+        if: always()
+        run: |
+          echo "::group::result.json"
+          cat result.json
+          echo "::endgroup::"
+          # <-- paste the generated reporting step here
+
+      - name: Upload result artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-drift-result
+          path: result.json
+          retention-days: 30
